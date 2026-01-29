@@ -1,7 +1,0 @@
-{
-  "name": "NEXUS - smart resources and space management system",
-  "description": "A high-tech campus management dashboard featuring real-time spatial grids, live SVG mapping, resource scheduling, and resource monitoring.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
-}

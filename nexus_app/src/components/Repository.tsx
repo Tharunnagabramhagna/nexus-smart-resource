@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 
 const Repository: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
