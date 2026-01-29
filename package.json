@@ -1,0 +1,13 @@
+{
+  "name": "nexus-app",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Smart Resource & Space Management System",
+  "scripts": {
+    "dev": "cd nexus_app && python -m http.server 3000",
+    "start": "cd nexus_app && python -m http.server 3000"
+  },
+  "keywords": ["resource", "management", "booking"],
+  "author": "",
+  "license": "ISC"
+}
