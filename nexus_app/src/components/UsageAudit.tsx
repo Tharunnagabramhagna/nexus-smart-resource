@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Resource } from '../../types';
+import { Resource } from '../types';
 
 interface UsageAuditProps {
   isDarkMode: boolean;

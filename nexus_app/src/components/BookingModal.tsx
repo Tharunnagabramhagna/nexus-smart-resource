@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Resource } from '../../types';
+import { Resource } from '../types';
 
 type BookingStep = 'initial' | 'conflict' | 'summary' | 'success';
 

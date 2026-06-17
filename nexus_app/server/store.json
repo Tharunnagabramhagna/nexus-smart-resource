@@ -1,0 +1,245 @@
+{
+  "resources": [
+    {
+      "id": "lab-aiml",
+      "name": "AI/ML Computing Lab",
+      "category": "lab",
+      "status": "available",
+      "capacity": 50,
+      "location": "Cyber-Wing, Floor 2",
+      "zone": "A",
+      "maxLoad": 50,
+      "environment": "LAB",
+      "tag": "HIGH DEMAND",
+      "description": "Specialized deep learning facility with high-performance GPU clusters, modular workstations, and immersive model visualisation arrays.",
+      "assets": [
+        "NVIDIA H100 GPU CLUSTER",
+        "TENSOR PROCESSING UNITS (TPU V4)",
+        "400GBPS INFINIBAND FABRIC"
+      ],
+      "specification": "Resource-optimised compute floor designed for AI research, simulation, and live inferencing.",
+      "preview": "network"
+    },
+    {
+      "id": "hall-newton",
+      "name": "Newton Lecture Hall",
+      "category": "room",
+      "status": "available",
+      "capacity": 180,
+      "location": "Academic Wing, Level 1",
+      "zone": "B",
+      "maxLoad": 180,
+      "environment": "ROOM",
+      "tag": "AI OPTIMIZED",
+      "description": "Premier large-capacity lecture hall built for hybrid teaching with panoramic projection and acoustic zoning.",
+      "assets": [
+        "4K PANORAMIC PROJECTION",
+        "HYBRID TEACHING ARRAY",
+        "ADAPTIVE AUDIO MATRIX"
+      ],
+      "specification": "Large-format teaching venue for seminars, events, and real-time collaboration.",
+      "preview": "lecture"
+    },
+    {
+      "id": "gallery-arya",
+      "name": "Aryabhatta Gallery",
+      "category": "room",
+      "status": "available",
+      "capacity": 150,
+      "location": "Main Block, Level 3",
+      "zone": "C",
+      "maxLoad": 150,
+      "environment": "ROOM",
+      "tag": "LOW USAGE",
+      "description": "Presentation-grade gallery space designed for high impact demos, poster sessions, and hybrid showcases.",
+      "assets": [
+        "ULTRA-WIDE DISPLAY WALL",
+        "SMART LIGHTING GRID",
+        "STREAMING PODIUM"
+      ],
+      "specification": "Flexible venue for demos and collaborative exhibitions.",
+      "preview": "gallery"
+    },
+    {
+      "id": "hall-turing",
+      "name": "Turing Logic Hall",
+      "category": "room",
+      "status": "occupied",
+      "capacity": 80,
+      "location": "CS Block, Level 2",
+      "zone": "D",
+      "maxLoad": 80,
+      "environment": "ROOM",
+      "tag": "RESTRICTED",
+      "description": "Compact seminar hall for advanced sessions and review meetings with secure access control.",
+      "assets": [
+        "SECURE ACCESS LOCK",
+        "MODULAR STAGE POD",
+        "LOW-LATENCY SCREEN CAST"
+      ],
+      "specification": "Best for focused academic meetings and controlled discussions.",
+      "preview": "seminar"
+    },
+    {
+      "id": "rack-gpu",
+      "name": "Mobile GPU Server Rack",
+      "category": "equipment",
+      "status": "available",
+      "capacity": 1,
+      "location": "Server Room 4A",
+      "zone": "E",
+      "maxLoad": 1,
+      "environment": "EQUIPMENT",
+      "tag": "AI OPTIMIZED",
+      "description": "Portable high-performance compute node for robotics demos, field inferencing, and burst workloads.",
+      "assets": [
+        "DUAL GPU EDGE MODULE",
+        "BATTERY BACKUP",
+        "REMOTE TELEMETRY STACK"
+      ],
+      "specification": "Movable compute system for high-demand technical deployments.",
+      "preview": "equipment"
+    },
+    {
+      "id": "lab-raman",
+      "name": "Raman Physics Lab",
+      "category": "lab",
+      "status": "available",
+      "capacity": 42,
+      "location": "Science Block, Level 4",
+      "zone": "F",
+      "maxLoad": 42,
+      "environment": "LAB",
+      "tag": "LOW USAGE",
+      "description": "Precision instrumentation lab for optics, quantum experimentation, and signal analysis.",
+      "assets": [
+        "LASER TEST BAY",
+        "VACUUM CHAMBER",
+        "ANALYSIS CONSOLE"
+      ],
+      "specification": "Controlled research environment with high-sensitivity instruments.",
+      "preview": "lab"
+    },
+    {
+      "id": "studio-hybrid",
+      "name": "Hybrid Teaching Studio",
+      "category": "room",
+      "status": "maintenance",
+      "capacity": 60,
+      "location": "Media Wing, Level 2",
+      "zone": "G",
+      "maxLoad": 60,
+      "environment": "ROOM",
+      "tag": "RESTRICTED",
+      "description": "Specialized teaching studio with capture rigs and hybrid broadcast capability.",
+      "assets": [
+        "MULTI-CAM RIG",
+        "SMART BOARD",
+        "AUDIO CONTROL DECK"
+      ],
+      "specification": "Reserved for scheduled hybrid instruction and live sessions.",
+      "preview": "studio"
+    }
+  ],
+  "bookings": [
+    {
+      "id": "book-1001",
+      "resourceId": "hall-turing",
+      "resourceName": "Turing Logic Hall",
+      "userEmail": "admin@nexus.ai",
+      "date": "2026-06-17",
+      "startTime": "10:00",
+      "endTime": "12:00",
+      "status": "confirmed",
+      "createdAt": "2026-06-16T18:15:00.000Z"
+    },
+    {
+      "id": "book-1002",
+      "resourceId": "lab-aiml",
+      "resourceName": "AI/ML Computing Lab",
+      "userEmail": "admin@nexus.ai",
+      "date": "2026-06-18",
+      "startTime": "09:00",
+      "endTime": "11:00",
+      "status": "confirmed",
+      "createdAt": "2026-06-16T18:20:00.000Z"
+    },
+    {
+      "id": "a1ec9b25-e192-40d0-ae2d-fb21471ee41f",
+      "resourceId": "gallery-arya",
+      "resourceName": "Aryabhatta Gallery",
+      "userEmail": "admin@nexus.ai",
+      "date": "2026-06-19",
+      "startTime": "13:00",
+      "endTime": "14:00",
+      "status": "confirmed",
+      "createdAt": "2026-06-16T18:58:21.641Z"
+    }
+  ],
+  "issues": [
+    {
+      "id": "issue-9001",
+      "resourceId": "studio-hybrid",
+      "resourceName": "Hybrid Teaching Studio",
+      "severity": "medium",
+      "summary": "Capture rig calibration pending after overnight maintenance.",
+      "reportedBy": "ops@nexus.ai",
+      "createdAt": "2026-06-16T19:10:00.000Z",
+      "resolved": false
+    },
+    {
+      "id": "17eb71d6-3f9e-4800-993f-f71e4908686d",
+      "resourceId": "lab-raman",
+      "resourceName": "Raman Physics Lab",
+      "severity": "medium",
+      "summary": "Calibration warning in optics bay",
+      "reportedBy": "admin@nexus.ai",
+      "createdAt": "2026-06-16T19:07:26.702Z",
+      "resolved": false
+    }
+  ],
+  "activityLog": [
+    {
+      "id": "log-1",
+      "resourceName": "Newton Lecture Hall",
+      "timestamp": "2026-06-16T19:22:00.000Z",
+      "message": "BROADCAST_OK"
+    },
+    {
+      "id": "log-2",
+      "resourceName": "AI/ML Computing Lab",
+      "timestamp": "2026-06-16T19:24:00.000Z",
+      "message": "SYNC_READY"
+    },
+    {
+      "id": "fdb771f3-0c72-468c-84a5-206f132e0794",
+      "resourceName": "Aryabhatta Gallery",
+      "timestamp": "2026-06-16T18:58:21.641Z",
+      "message": "BOOKING_OK"
+    },
+    {
+      "id": "996cf21c-deae-4b71-aaf7-132885c2d62c",
+      "resourceName": "Aryabhatta Gallery",
+      "timestamp": "2026-06-16T18:58:53.163Z",
+      "message": "STATE_AVAILABLE"
+    },
+    {
+      "id": "6d8522dd-9b8c-4cf7-b616-e539530e5e1c",
+      "resourceName": "Raman Physics Lab",
+      "timestamp": "2026-06-16T19:07:26.702Z",
+      "message": "ISSUE_REPORTED"
+    },
+    {
+      "id": "e2a348c6-e454-41b3-9f17-7738d94ec00a",
+      "resourceName": "Turing Logic Hall",
+      "timestamp": "2026-06-16T19:11:55.632Z",
+      "message": "STATE_AVAILABLE"
+    },
+    {
+      "id": "165b6859-0e8c-4268-a516-a3827bb3d674",
+      "resourceName": "Turing Logic Hall",
+      "timestamp": "2026-06-16T19:12:00.336Z",
+      "message": "STATE_OCCUPIED"
+    }
+  ]
+}

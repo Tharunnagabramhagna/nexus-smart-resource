@@ -7,29 +7,27 @@ export interface Equipment {
 export interface Resource {
   id: string;
   name: string;
-
-  type: 'lab' | 'classroom' | 'equipment' | 'parking';
-
+  type: 'lab' | 'classroom' | 'equipment' | 'parking' | 'room';
+  category?: 'lab' | 'room' | 'equipment' | 'parking';
   status: 'available' | 'occupied' | 'maintenance';
-
-  /** Only relevant for compute resources */
   gpuStatus?: 'idle' | 'busy' | 'offline';
-
-  imageUrl: string;
+  imageUrl?: string;
   capacity: number;
-
   location?: string;
+  zone?: string;
+  maxLoad?: number;
+  environment?: string;
   description?: string;
-
-  /** Sub-equipment for labs / rooms */
   equipment?: Equipment[];
-
-  /** AI / system-generated tag */
-  recommendationTag?: 
+  assets?: string[];
+  specification?: string;
+  preview?: string;
+  recommendationTag?:
     | 'HIGH DEMAND'
     | 'AI OPTIMIZED'
     | 'RESTRICTED'
     | 'LOW USAGE';
+  tag?: 'HIGH DEMAND' | 'AI OPTIMIZED' | 'RESTRICTED' | 'LOW USAGE';
 }
 
 export interface User {

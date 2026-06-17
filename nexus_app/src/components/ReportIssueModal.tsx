@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Resource } from '../../types';
+import { Resource } from '../types';
 
 interface ReportIssueModalProps {
   isOpen: boolean;

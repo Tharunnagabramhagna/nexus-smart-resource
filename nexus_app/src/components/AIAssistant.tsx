@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Resource } from '../../types';
+import { Resource } from '../types';
 
 interface AIAssistantProps {
   isDarkMode: boolean;

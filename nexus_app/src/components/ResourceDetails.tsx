@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Resource } from '../../types';
+import { Resource } from '../types';
 
 type BookingPayload = {
   resourceName: string;
