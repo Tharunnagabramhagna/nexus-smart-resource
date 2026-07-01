@@ -9,11 +9,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [email, setEmail] = useState<string>('pavan@srmap.edu.in');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [offlineReady, setOfflineReady] = useState<null | { email: string; role: 'admin' | 'student' }>(null);
   const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
   const syncIdentity = async (identity: string, role: 'admin' | 'student') => {
     setBusy(role);
     setError(null);
+    setOfflineReady(null);
 
     try {
       const response = await fetch(`${API_BASE}/auth/login`, {
@@ -32,7 +34,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         isLoggedIn: true,
       } as User);
     } catch (issue) {
-      setError(issue instanceof Error ? issue.message : 'Unable to sync identity.');
+      const message = issue instanceof Error ? issue.message : 'Unable to sync identity.';
+      setError(message);
+      setOfflineReady({ email: identity, role });
     } finally {
       setBusy(null);
     }
@@ -117,6 +121,22 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             <div className="mb-6 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
               {error}
             </div>
+          ) : null}
+
+          {offlineReady ? (
+            <button
+              onClick={() =>
+                onLogin({
+                  email: offlineReady.email,
+                  role: offlineReady.role,
+                  name: offlineReady.role === 'admin' ? 'ADMIN' : offlineReady.email.split('@')[0],
+                  isLoggedIn: true,
+                } as User)
+              }
+              className="mb-6 w-full rounded-2xl border border-cyan-400/20 bg-cyan-500/10 py-4 text-[10px] font-black uppercase tracking-[0.28em] text-cyan-200 hover:bg-cyan-500/15"
+            >
+              Continue in demo mode
+            </button>
           ) : null}
 
           <form onSubmit={handleSubmit} className="space-y-6">
