@@ -1,147 +1,289 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+
+type GuideData = {
+  directive: string;
+  architecture: Array<{ id: string; title: string; description: string }>;
+  roadmap: Array<{ label: string; detail: string }>;
+  impact: Array<{ metric: string; before: string; after: string; delta: string }>;
+};
 
 interface SystemGuideProps {
   isDarkMode: boolean;
+  guide: GuideData;
 }
 
-const SystemGuide: React.FC<SystemGuideProps> = ({ isDarkMode }) => {
-  const [isDemoRunning, setIsDemoRunning] = useState<boolean>(false);
-  const demoTimerRef = useRef<number | null>(null);
+const guideCapabilities = [
+  {
+    title: 'NO AUTO-BOOKING',
+    description: 'AI does not book resources independently.',
+  },
+  {
+    title: 'GUIDED ADVICE',
+    description: 'Generates space recommendations based on capacity.',
+  },
+  {
+    title: 'CONFLICT ANALYSIS',
+    description: 'AI predicts and prevents scheduling collisions.',
+  },
+  {
+    title: 'OPERATIONAL INTEL',
+    description: 'Synthesizes logs for admin oversight.',
+  },
+];
+
+const demoStates = ['initial', 'detect', 'resolve'] as const;
+
+const SystemGuide: React.FC<SystemGuideProps> = ({ isDarkMode, guide }) => {
+  const [phase, setPhase] = useState<(typeof demoStates)[number]>('initial');
+  const timerRef = useRef<number | null>(null);
 
   const textPrimary = isDarkMode ? 'text-white' : 'text-slate-900';
-  const textSecondary = isDarkMode ? 'text-white/40' : 'text-slate-500';
+  const textSecondary = isDarkMode ? 'text-white/45' : 'text-slate-500';
   const cardBg = isDarkMode
-    ? 'bg-[#0a0a16]/60 border-white/5'
+    ? 'bg-[#0a0f22]/82 border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.26)]'
     : 'bg-white border-slate-200 shadow-sm';
 
-  const architectureItems = useMemo(
-    () => [
-      {
-        id: 'frontend',
-        title: 'FRONTEND',
-        desc:
-          'The digital dashboard where users explore resources and admins manage the facility.',
-        icon: (
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-            />
-          </svg>
-        ),
-      },
-      {
-        id: 'backend',
-        title: 'BACKEND',
-        desc:
-          'The engine room that calculates schedules and prevents double-bookings in real-time.',
-        icon: (
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
-            />
-          </svg>
-        ),
-      },
-      {
-        id: 'database',
-        title: 'DATABASE',
-        desc:
-          'A centralized library that securely stores all resource details, user roles, and booking history.',
-        icon: (
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-            />
-          </svg>
-        ),
-      },
-      {
-        id: 'ai',
-        title: 'AI LAYER',
-        desc:
-          'A smart brain powered by Gemini that provides spatial insights and prevents scheduling conflicts.',
-        icon: (
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-7.714 2.143L11 21l-2.286-6.857L1 12l7.714-2.143L11 3z"
-            />
-          </svg>
-        ),
-      },
-    ],
-    []
-  );
+  const architectureItems = useMemo(() => guide.architecture || [], [guide.architecture]);
 
-  const handleRunDemo = () => {
-    if (isDemoRunning) return;
+  const cycleDemo = () => {
+    window.clearTimeout(timerRef.current || undefined);
+    setPhase('initial');
 
-    setIsDemoRunning(true);
-
-    demoTimerRef.current = window.setTimeout(() => {
-      setIsDemoRunning(false);
-    }, 3000);
+    timerRef.current = window.setTimeout(() => {
+      setPhase('detect');
+      timerRef.current = window.setTimeout(() => {
+        setPhase('resolve');
+        timerRef.current = window.setTimeout(() => {
+          setPhase('initial');
+        }, 1800);
+      }, 1800);
+    }, 1400);
   };
 
   useEffect(() => {
     return () => {
-      if (demoTimerRef.current) {
-        clearTimeout(demoTimerRef.current);
-        demoTimerRef.current = null;
-      }
+      if (timerRef.current) window.clearTimeout(timerRef.current);
     };
   }, []);
 
   return (
-    <div className="p-10 max-w-[1400px] mx-auto animate-in fade-in duration-700 h-full overflow-y-auto custom-scrollbar pb-32">
-      {/* Architecture Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-        {architectureItems.map(item => (
-          <div
-            key={item.id}
-            className={`p-10 rounded-[32px] border ${cardBg} group hover:border-blue-500/30 transition-all duration-500 flex flex-col items-start gap-4 relative overflow-hidden`}
-          >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-[60px] rounded-full group-hover:bg-blue-500/10 transition-colors" />
-            <div className="p-4 bg-blue-500/10 border border-blue-500/10 rounded-2xl text-blue-500 group-hover:scale-105 transition-transform">
-              {item.icon}
-            </div>
-            <h3 className={`text-base font-black uppercase tracking-[0.2em] ${textPrimary}`}>
-              {item.title}
-            </h3>
-            <p
-              className={`text-[13px] leading-relaxed ${textSecondary} font-medium tracking-tight max-w-[90%]`}
-            >
-              {item.desc}
-            </p>
-          </div>
-        ))}
+    <div className="mx-auto max-w-[1520px] px-4 pb-16 pt-6 md:px-0">
+      <div className="mb-8">
+        <h2 className="text-3xl font-black tracking-tight text-white md:text-[2.6rem]">
+          NEXUS System Guide
+        </h2>
+        <p className="mt-2 text-[10px] font-black uppercase tracking-[0.28em] text-white/35">
+          Technical directive // core objective
+        </p>
       </div>
 
-      {/* Demo Button */}
-      <button
-        onClick={handleRunDemo}
-        disabled={isDemoRunning}
-        className={`w-full p-8 rounded-[40px] border transition-all text-left flex items-center gap-6 ${
-          isDemoRunning
-            ? 'border-emerald-500 bg-emerald-500/10'
-            : 'border-blue-600/40 bg-blue-600/10 hover:bg-blue-600/20'
-        }`}
-      >
-        <h2 className="text-2xl font-black uppercase tracking-[0.1em] text-white">
-          {isDemoRunning ? 'RESOLVING CONFLICTS…' : 'CONFLICT RESOLUTION DEMO'}
-        </h2>
-      </button>
+      <section className={`rounded-[34px] border p-6 md:p-8 ${cardBg}`}>
+        <div className="inline-flex rounded-full border border-blue-400/20 bg-blue-500/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.26em] text-blue-300">
+          Technical directive // core objective
+        </div>
+        <p className={`mt-5 max-w-[1100px] text-sm leading-7 ${textSecondary}`}>
+          {guide.directive}
+        </p>
+      </section>
+
+      <section className="mt-8">
+        <div className="mb-5 flex items-center gap-3">
+          <span className="text-lg text-blue-300">◈</span>
+          <h3 className="text-2xl font-black uppercase tracking-[0.08em] text-white">
+            System architecture
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          {architectureItems.map(item => (
+            <article key={item.id} className={`rounded-[30px] border p-7 ${cardBg}`}>
+              <div className="mb-4 text-[10px] font-black uppercase tracking-[0.22em] text-blue-300">
+                {item.title}
+              </div>
+              <p className={`max-w-[460px] text-sm leading-7 ${textSecondary}`}>
+                {item.description}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className={`mt-8 rounded-[34px] border p-6 md:p-8 ${cardBg}`}>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.28em] text-blue-300">
+              Conflict resolution demo
+            </div>
+            <h3 className="mt-3 text-2xl font-black uppercase tracking-[0.08em] text-white">
+              Simulated intervention sequence
+            </h3>
+          </div>
+          <button
+            onClick={cycleDemo}
+            className="rounded-full border border-blue-400/25 bg-blue-600/15 px-5 py-3 text-[10px] font-black uppercase tracking-[0.24em] text-blue-200 transition-all hover:bg-blue-600/25"
+          >
+            Run demo
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <article
+            className={`rounded-[28px] border p-5 transition-all ${
+              phase === 'initial'
+                ? 'border-blue-400/35 bg-blue-500/10'
+                : 'border-white/10 bg-white/[0.02]'
+            }`}
+          >
+            <div className="text-sm font-black uppercase tracking-[0.22em] text-blue-300">01 Initial attempt</div>
+            <div className="mt-5 rounded-[22px] border border-emerald-400/25 bg-emerald-400/8 p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/55">
+                User A (active)
+              </div>
+              <div className="mt-2 text-lg font-black text-white">AI/ML Lab</div>
+              <div className="mt-2 text-sm text-emerald-300">10:00 → 12:00</div>
+            </div>
+            <div className="mt-4 rounded-[22px] border border-blue-400/20 bg-blue-400/8 p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/55">
+                User B (request)
+              </div>
+              <div className="mt-2 text-lg font-black text-white">AI/ML Lab</div>
+              <div className="mt-2 text-sm text-blue-200">11:30 → 13:30</div>
+            </div>
+            <p className={`mt-4 text-sm leading-7 ${textSecondary}`}>
+              User B tries to book the same room during User A’s active session.
+            </p>
+          </article>
+
+          <article
+            className={`rounded-[28px] border p-5 transition-all ${
+              phase === 'detect'
+                ? 'border-rose-400/35 bg-rose-500/10'
+                : 'border-white/10 bg-white/[0.02]'
+            }`}
+          >
+            <div className="text-sm font-black uppercase tracking-[0.22em] text-rose-300">02 Detection</div>
+            <div className="mt-6 flex justify-center">
+              <div className="grid h-24 w-24 place-items-center rounded-full border-2 border-rose-400/50 bg-rose-500/10 text-3xl text-rose-300 shadow-[0_0_28px_rgba(244,63,94,0.25)]">
+                ⊗
+              </div>
+            </div>
+            <div className="mt-5 text-center">
+              <div className="text-xl font-black uppercase tracking-[0.12em] text-rose-300">
+                Collision detected
+              </div>
+              <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/55">
+                30-minute overlap
+              </div>
+            </div>
+            <div className="mt-5 rounded-[22px] border border-rose-400/20 bg-rose-400/8 p-4 text-sm leading-7 text-white/70">
+              AI actively blocks the request and prevents a double-booking from being confirmed.
+            </div>
+          </article>
+
+          <article
+            className={`rounded-[28px] border p-5 transition-all ${
+              phase === 'resolve'
+                ? 'border-emerald-400/35 bg-emerald-500/10'
+                : 'border-white/10 bg-white/[0.02]'
+            }`}
+          >
+            <div className="text-sm font-black uppercase tracking-[0.22em] text-emerald-300">03 Resolution</div>
+            <div className="mt-5 rounded-[22px] border border-emerald-400/22 bg-emerald-400/8 p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-200/80">
+                AI recommendation
+              </div>
+              <div className="mt-2 text-lg font-black text-white">Cybersecurity Center</div>
+              <div className="mt-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/60">
+                <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-emerald-200">Same time</span>
+                <span className="rounded-full bg-white/10 px-3 py-1">Available</span>
+              </div>
+            </div>
+            <div className="mt-5 rounded-[22px] border border-blue-400/18 bg-blue-500/8 p-4 text-sm leading-7 text-white/70">
+              Double-booking is prevented. Facility throughput improves through optimized reassignment.
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className={`mt-8 rounded-[34px] border p-6 md:p-8 ${cardBg}`}>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
+          <div>
+            <div className="mb-5">
+              <div className="text-[10px] font-black uppercase tracking-[0.28em] text-blue-300">
+                AI operating rules
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {guideCapabilities.map(item => (
+                <article
+                  key={item.title}
+                  className="rounded-[26px] border border-white/10 bg-white/[0.02] p-5"
+                >
+                  <div className={`text-[11px] font-black uppercase tracking-[0.18em] ${textPrimary}`}>
+                    {item.title}
+                  </div>
+                  <p className={`mt-3 text-sm leading-7 ${textSecondary}`}>{item.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-5 flex items-center gap-3">
+              <span className="text-lg text-blue-300">◈</span>
+              <h3 className="text-2xl font-black uppercase tracking-[0.08em] text-white">
+                Scalability roadmap
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              {guide.roadmap.map(item => (
+                <article
+                  key={item.label}
+                  className="rounded-[28px] border border-white/10 bg-white/[0.02] p-6"
+                >
+                  <div className="text-[11px] font-black uppercase tracking-[0.2em] text-white">
+                    {item.label}
+                  </div>
+                  <p className={`mt-3 text-sm leading-7 ${textSecondary}`}>{item.detail}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={`mt-8 rounded-[34px] border p-6 md:p-8 ${cardBg}`}>
+        <div className="mb-5 flex items-center gap-3">
+          <span className="text-lg text-blue-300">◈</span>
+          <h3 className="text-2xl font-black uppercase tracking-[0.08em] text-white">
+            Impact metrics
+          </h3>
+        </div>
+
+        <div className="overflow-hidden rounded-[28px] border border-blue-400/15">
+          <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr] border-b border-white/10 bg-blue-500/8 px-5 py-4 text-[10px] font-black uppercase tracking-[0.22em] text-white/60">
+            <span>Metric</span>
+            <span>Before Nexus</span>
+            <span>After Nexus</span>
+            <span>Delta</span>
+          </div>
+
+          {guide.impact.map(item => (
+            <div
+              key={item.metric}
+              className="grid grid-cols-[1.4fr_1fr_1fr_1fr] items-center border-b border-white/6 bg-white/[0.02] px-5 py-5 text-sm last:border-b-0"
+            >
+              <span className="font-black uppercase tracking-[0.12em] text-white">{item.metric}</span>
+              <span className="text-white/60">{item.before}</span>
+              <span className="text-blue-200">{item.after}</span>
+              <span className={`${item.delta.startsWith('+') ? 'text-emerald-300' : 'text-blue-200'} font-black`}>
+                {item.delta}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 };

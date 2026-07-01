@@ -6,41 +6,53 @@ interface AuthProps {
 }
 
 const Auth: React.FC<AuthProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState<string>(''); 
+  const [email, setEmail] = useState<string>('pavan@srmap.edu.in');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const syncIdentity = async (identity: string, role: 'admin' | 'student') => {
+    setBusy(role);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: identity, role }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.message || 'Authentication failed.');
+      }
+
+      onLogin({
+        ...payload.user,
+        isLoggedIn: true,
+      } as User);
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : 'Unable to sync identity.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const normalizedEmail = email.trim().toLowerCase();
     const finalEmail = normalizedEmail || 'pavan@srmap.edu.in';
-
-    const isAdmin =
-      finalEmail.includes('admin') || finalEmail === 'pavan@srmap.edu.in';
-
-    onLogin({
-      email: finalEmail,
-      name: isAdmin ? 'Nexus Administrator' : 'Campus Student',
-      role: isAdmin ? 'admin' : 'student',
-      isLoggedIn: true,
-    });
+    const role = finalEmail.includes('admin') || finalEmail === 'pavan@srmap.edu.in' ? 'admin' : 'student';
+    await syncIdentity(finalEmail, role);
   };
 
-  const handleGoogleLogin = () => {
-    onLogin({
-      email: 'student@srmap.edu.in',
-      name: 'Google User',
-      role: 'student',
-      isLoggedIn: true,
-    });
+  const handleGoogleLogin = async () => {
+    await syncIdentity('student@srmap.edu.in', 'student');
   };
 
-  const handleAdminQuickLink = () => {
-    onLogin({
-      email: 'admin@nexus.ai',
-      name: 'Systems Administrator',
-      role: 'admin',
-      isLoggedIn: true,
-    });
+  const handleAdminQuickLink = async () => {
+    await syncIdentity('admin@nexus.ai', 'admin');
   };
 
   return (
@@ -101,6 +113,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             </p>
           </div>
 
+          {error ? (
+            <div className="mb-6 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+              {error}
+            </div>
+          ) : null}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <label className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] ml-1">
               Institutional Identity
@@ -117,9 +135,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
             <button
               type="submit"
+              disabled={!!busy}
               className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-2xl transition-all"
             >
-              Sync Identity
+              {busy === 'admin' || busy === 'student' ? 'Syncing...' : 'Sync Identity'}
             </button>
           </form>
 
@@ -127,12 +146,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
           <button
             onClick={handleGoogleLogin}
-            className="w-full bg-white/[0.02] border border-white/5 text-white py-4 rounded-2xl mb-6"
+            disabled={!!busy}
+            className="w-full bg-white/[0.02] border border-white/5 text-white py-4 rounded-2xl mb-6 disabled:opacity-60"
           >
             Sign in with Google
           </button>
 
-          <button onClick={handleAdminQuickLink} className="w-full text-center">
+          <button onClick={handleAdminQuickLink} disabled={!!busy} className="w-full text-center disabled:opacity-60">
             <span className="text-[9px] text-white/30 uppercase tracking-widest hover:text-blue-400">
               Systems Administrator Access
             </span>
@@ -140,10 +160,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-[9px] text-white/20 tracking-widest text-center px-4 w-full">
-        THIS APP WAS DEVELOPED BY ANOTHER USER. IT MAY BE INACCURATE OR UNSAFE.
-      </div>
     </div>
   );
 };

@@ -1,182 +1,277 @@
 import React, { useMemo } from 'react';
 import { Resource } from '../types';
 
+type DashboardData = {
+  stats: Array<{ label: string; value: string }>;
+  utilization: Array<{ category: string; percent: number }>;
+  impact: { baseline: string; optimized: string; gain: string };
+  anomalies: Array<{ id: string; name: string; signal: string }>;
+  activityLog: Array<{ id: string; resourceName: string; timestamp: string; message: string }>;
+  nodeCounts: Record<'available' | 'occupied' | 'maintenance', number>;
+};
+
 interface UsageAuditProps {
   isDarkMode: boolean;
   resources: Resource[];
+  dashboard: DashboardData;
   onStatusChange: (id: string, newStatus: Resource['status']) => void;
 }
-
-type AuditLog = {
-  id: number;
-  time: string;
-  msg: string;
-  status: string;
-};
 
 const UsageAudit: React.FC<UsageAuditProps> = ({
   isDarkMode,
   resources,
+  dashboard,
   onStatusChange,
 }) => {
-  const {
-    activeNodesCount,
-    occupiedCount,
-    maintenanceCount,
-  } = useMemo(() => {
-    let occupied = 0;
-    let maintenance = 0;
-
-    for (const r of resources) {
-      if (r.status === 'occupied') occupied++;
-      if (r.status === 'maintenance') maintenance++;
-    }
-
-    return {
-      activeNodesCount: resources.length,
-      occupiedCount: occupied,
-      maintenanceCount: maintenance,
-    };
-  }, [resources]);
-
-  const logs: AuditLog[] = useMemo(
-    () => [
-      { id: 1, time: '2024-02-25 14:02:11', msg: 'NEWTON LECTURE HALL', status: 'BROADCAST_OK' },
-      { id: 2, time: '2024-02-25 14:01:45', msg: 'AI/ML COMPUTING LAB', status: 'SYNC_NOMINAL' },
-      { id: 3, time: '2024-02-25 13:58:22', msg: 'TESLA SEMINAR ROOM', status: 'NODE_RELEASED' },
-      { id: 4, time: '2024-02-25 13:45:01', msg: 'SYSTEM_GLOBAL_OVERRIDE', status: 'INIT_AUTH' },
-    ],
-    []
-  );
-
-  const utilizationTimeline = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => ({
-        hour: i * 2,
-        value: i < 3 ? 20 : 0,
-      })),
-    []
-  );
-
-  const textPrimary = isDarkMode ? 'text-white' : 'text-slate-900';
   const cardBg = isDarkMode
-    ? 'bg-[#0a0a16]/80 border-white/5'
-    : 'bg-white border-slate-200';
+    ? 'bg-[#0a0f22]/80 border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.26)]'
+    : 'bg-white border-slate-200 shadow-sm';
+
+  const summaryCards = useMemo(() => {
+    const statsMap = Object.fromEntries(dashboard.stats.map(item => [item.label, item.value]));
+    return [
+      { label: 'ACTIVE NODES', value: statsMap['ACTIVE NODES'] || String(resources.length), tone: 'text-white' },
+      { label: 'CONFIRMED LOADS', value: statsMap['CONFIRMED LOADS'] || String(dashboard.nodeCounts.occupied), tone: 'text-emerald-400' },
+      { label: 'OPEN INCIDENTS', value: statsMap['OPEN INCIDENTS'] || String(dashboard.nodeCounts.maintenance), tone: 'text-rose-400' },
+      { label: 'SYSTEM HEALTH', value: statsMap['SYSTEM HEALTH'] || '99.9%', tone: 'text-amber-300' },
+    ];
+  }, [dashboard, resources.length]);
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto animate-in fade-in duration-700 h-full overflow-y-auto custom-scrollbar">
-      {/* SUMMARY */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-        <div className={`p-6 rounded-[24px] border ${cardBg}`}>
-          <div className="text-[10px] uppercase text-white/30 mb-2">ACTIVE NODES</div>
-          <div className="text-4xl font-black text-blue-500">{activeNodesCount}</div>
+    <div className="mx-auto max-w-[1520px] px-4 pb-14 pt-6 md:px-0">
+      <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-black tracking-tight text-white md:text-[2.6rem]">
+            Command Center
+          </h2>
+          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/35">
+            System node oversight • real-time propagation
+          </p>
         </div>
-        <div className={`p-6 rounded-[24px] border ${cardBg}`}>
-          <div className="text-[10px] uppercase text-white/30 mb-2">CONFIRMED LOADS</div>
-          <div className="text-4xl font-black text-emerald-500">{occupiedCount}</div>
-        </div>
-        <div className={`p-6 rounded-[24px] border ${cardBg}`}>
-          <div className="text-[10px] uppercase text-white/30 mb-2">OPEN INCIDENTS</div>
-          <div className="text-4xl font-black text-red-500">{maintenanceCount}</div>
-        </div>
-        <div className={`p-6 rounded-[24px] border ${cardBg}`}>
-          <div className="text-[10px] uppercase text-white/30 mb-2">SYSTEM HEALTH</div>
-          <div className="text-4xl font-black text-amber-500">
-            99.9<span className="text-xl">%</span>
+
+        <div className="flex items-center gap-3">
+          <div className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/75">
+            Network
+          </div>
+          <div className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/75">
+            Tickets
           </div>
         </div>
       </div>
 
-      {/* UTILIZATION */}
-      <div className={`p-8 rounded-[32px] border ${cardBg} mb-10`}>
-        <h3 className="text-xs font-black uppercase tracking-widest mb-6">
-          UTILIZATION INDEX (%)
-        </h3>
-        <div className="space-y-2">
-          {utilizationTimeline.map(({ hour, value }) => (
-            <div key={hour} className="flex items-center gap-4">
-              <span className="text-[8px] mono text-white/20 w-6">{hour}h</span>
-              <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-600 transition-all duration-700"
-                  style={{ width: `${value}%` }}
-                />
-              </div>
-              <span className="text-[8px] mono text-white/40 w-6">{value}%</span>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {summaryCards.map(card => (
+          <div key={card.label} className={`rounded-[26px] border p-5 ${cardBg}`}>
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">
+              {card.label}
             </div>
-          ))}
-        </div>
+            <div className={`mt-4 text-4xl font-black ${card.tone}`}>{card.value}</div>
+          </div>
+        ))}
       </div>
 
-      {/* ATOMIC SYNC LOG */}
-      <div className={`p-8 rounded-[32px] border ${cardBg} mb-10`}>
-        <h3 className="text-xs font-black uppercase tracking-widest mb-6">
-          ATOMIC SYNC LOG
-        </h3>
-        <div className="space-y-6">
-          {logs.map(log => (
-            <div
-              key={log.id}
-              className="border-l border-white/10 pl-4 hover:border-blue-500/50 transition-colors"
-            >
-              <div className="text-[10px] font-black uppercase text-white/80">
-                {log.msg}
+      <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
+        <div className="xl:col-span-5 space-y-5">
+          <section className={`rounded-[30px] border p-6 ${cardBg}`}>
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-[0.22em] text-white">
+                  Utilization index (%)
+                </h3>
+                <p className="mt-2 text-[10px] font-black uppercase tracking-[0.22em] text-white/30">
+                  Live sync
+                </p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[8px] mono text-white/20">{log.time}</span>
-                <span className="text-[8px] mono text-blue-500 font-bold">
-                  {log.status}
-                </span>
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-blue-300">
+                <span className="h-2 w-2 rounded-full bg-blue-400 shadow-[0_0_14px_rgba(96,165,250,0.8)]" />
+                Live sync
               </div>
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* NODE OVERRIDE MATRIX */}
-      <div className={`p-8 rounded-[40px] border ${cardBg}`}>
-        <h2 className={`text-xl font-black uppercase tracking-[0.2em] mb-8 ${textPrimary}`}>
-          NODE OVERRIDE MATRIX
-        </h2>
+            <div className="space-y-4">
+              {dashboard.utilization.map(item => (
+                <div key={item.category} className="grid grid-cols-[100px_1fr_auto] items-center gap-3">
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-white/65">
+                    {item.category}
+                  </span>
+                  <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-300"
+                      style={{ width: `${item.percent}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] font-black text-white/75">{item.percent}%</span>
+                </div>
+              ))}
+            </div>
+          </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {resources.map(res => (
-            <div
-              key={res.id}
-              className="p-6 rounded-[28px] border border-white/5 bg-white/[0.01]"
-            >
-              <div className="flex justify-between mb-4">
-                <h3 className="text-sm font-black uppercase truncate">{res.name}</h3>
-                <div
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    res.status === 'available'
-                      ? 'bg-emerald-500'
-                      : res.status === 'occupied'
-                      ? 'bg-red-500'
-                      : 'bg-amber-500'
+          <section className={`rounded-[30px] border p-6 ${cardBg}`}>
+            <div className="mb-5">
+              <h3 className="text-sm font-black uppercase tracking-[0.22em] text-white">
+                Global node override
+              </h3>
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.22em] text-white/30">
+                Atomic state control grid
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {resources.map(res => (
+                <article
+                  key={res.id}
+                  className={`rounded-[26px] border p-5 transition-all ${
+                    res.status === 'occupied'
+                      ? 'border-rose-500/40 bg-rose-500/6'
+                      : res.status === 'maintenance'
+                        ? 'border-amber-400/30 bg-amber-400/6'
+                        : 'border-emerald-400/20 bg-emerald-400/5'
                   }`}
-                />
-              </div>
+                >
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/45">
+                        {res.category || res.type}
+                      </div>
+                      <h4 className="mt-2 text-lg font-black uppercase leading-tight text-white">
+                        {res.name}
+                      </h4>
+                    </div>
+                    <span
+                      className={`mt-1 h-3 w-3 rounded-full ${
+                        res.status === 'available'
+                          ? 'bg-emerald-400 shadow-[0_0_18px_rgba(74,222,128,0.9)]'
+                          : res.status === 'occupied'
+                            ? 'bg-rose-400 shadow-[0_0_18px_rgba(251,113,133,0.9)]'
+                            : 'bg-amber-300 shadow-[0_0_18px_rgba(252,211,77,0.8)]'
+                      }`}
+                    />
+                  </div>
 
-              <div className="flex gap-1.5">
-                {(['available', 'occupied', 'maintenance'] as const).map(s => (
-                  <button
-                    key={s}
-                    onClick={() =>
-                      res.status !== s && onStatusChange(res.id, s)
-                    }
-                    className={`flex-1 py-2.5 rounded-xl text-[8px] font-black uppercase transition-all ${
-                      res.status === s
-                        ? 'bg-blue-500 text-black'
-                        : 'bg-white/5 text-white/30 hover:text-white'
-                    }`}
-                  >
-                    {s.substring(0, 5)}
-                  </button>
-                ))}
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['available', 'occupied', 'maintenance'] as const).map(state => {
+                      const active = res.status === state;
+                      return (
+                        <button
+                          key={state}
+                          onClick={() => !active && onStatusChange(res.id, state)}
+                          className={`rounded-2xl px-2 py-3 text-[9px] font-black uppercase tracking-[0.22em] transition-all ${
+                            active
+                              ? state === 'available'
+                                ? 'bg-emerald-400 text-[#08120d]'
+                                : state === 'occupied'
+                                  ? 'bg-rose-500 text-white'
+                                  : 'bg-amber-300 text-[#201400]'
+                              : 'border border-white/10 bg-white/[0.03] text-white/45 hover:bg-white/[0.08] hover:text-white'
+                          }`}
+                        >
+                          {state === 'maintenance' ? 'Maint' : state === 'occupied' ? 'Busy' : 'Avail'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="xl:col-span-4 space-y-5">
+          <section className={`rounded-[30px] border p-6 ${cardBg}`}>
+            <div className="mb-5">
+              <h3 className="text-sm font-black uppercase tracking-[0.22em] text-white">
+                Impact analysis
+              </h3>
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.22em] text-white/30">
+                Baseline vs optimized routing
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-5">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35">
+                  Manual baseline
+                </div>
+                <div className="mt-4 text-4xl font-black text-white">
+                  {dashboard.impact.baseline}
+                </div>
+              </div>
+              <div className="rounded-[22px] border border-blue-500/20 bg-blue-500/10 p-5">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-200/70">
+                  Nexus optimized
+                </div>
+                <div className="mt-4 text-4xl font-black text-blue-200">
+                  {dashboard.impact.optimized}
+                </div>
               </div>
             </div>
-          ))}
+
+            <div className="mt-4 rounded-[24px] border border-emerald-400/20 bg-emerald-400/10 p-5">
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-200/80">
+                Efficiency gain
+              </div>
+              <div className="mt-3 text-3xl font-black text-emerald-300">{dashboard.impact.gain}</div>
+            </div>
+          </section>
+
+          <section className={`rounded-[30px] border p-6 ${cardBg}`}>
+            <div className="mb-5">
+              <h3 className="text-sm font-black uppercase tracking-[0.22em] text-white">
+                Atomic sync log
+              </h3>
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.22em] text-white/30">
+                Recent system activity
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {dashboard.activityLog.map(log => (
+                <div
+                  key={log.id}
+                  className="rounded-[20px] border border-white/8 bg-white/[0.02] px-4 py-3"
+                >
+                  <div className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-300">
+                    {log.resourceName}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-white/45">
+                    <span>{new Date(log.timestamp).toISOString().slice(0, 10)}</span>
+                    <span className="font-black uppercase tracking-[0.18em] text-white/75">
+                      {log.message}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="xl:col-span-3">
+          <section className={`rounded-[30px] border p-6 ${cardBg}`}>
+            <div className="mb-5">
+              <h3 className="text-sm font-black uppercase tracking-[0.22em] text-white">
+                System anomalies
+              </h3>
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.22em] text-white/30">
+                Flagged nodes
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {dashboard.anomalies.map(item => (
+                <div
+                  key={item.id}
+                  className="rounded-[20px] border border-amber-400/12 bg-amber-400/6 px-4 py-4"
+                >
+                  <div className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-200">
+                    {item.name}
+                  </div>
+                  <div className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-amber-300/80">
+                    {item.signal}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
     </div>

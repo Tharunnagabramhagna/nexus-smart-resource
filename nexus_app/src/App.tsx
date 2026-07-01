@@ -4,7 +4,7 @@ import SystemGuide from './components/SystemGuide';
 import UsageAudit from './components/UsageAudit';
 import { Resource, User } from './types';
 
-type ViewKey = 'explore' | 'map' | 'admin' | 'guide';
+type ViewKey = 'explore' | 'map' | 'reservations' | 'conflicts' | 'admin' | 'guide';
 type CategoryKey = 'all' | 'lab' | 'room' | 'equipment' | 'parking';
 type StatusKey = 'available' | 'occupied' | 'maintenance';
 
@@ -148,6 +148,7 @@ function toUiResource(resource: ApiResource): Resource {
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<ViewKey>('explore');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -158,6 +159,9 @@ function App() {
   const [bookingForm, setBookingForm] = useState(defaultBookingForm);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const [recommendation, setRecommendation] = useState<{ title: string; action: string } | null>(null);
+  const [reservationOpen, setReservationOpen] = useState(false);
+  const [reservationSeed, setReservationSeed] = useState(defaultBookingForm);
 
   const loadBootstrap = async () => {
     try {
@@ -251,40 +255,6 @@ function App() {
     }
   };
 
-  const handleBooking = async () => {
-    if (!selectedResource || !user) return;
-    setBusy('booking');
-    try {
-      const response = await fetch(`${API_BASE}/bookings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          resourceId: selectedResource.id,
-          userEmail: user.email,
-          date: bookingForm.date,
-          startTime: bookingForm.startTime,
-          endTime: bookingForm.endTime,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.message || 'Booking failed.');
-      }
-      await loadBootstrap();
-      setMessage({
-        kind: 'success',
-        text: `${selectedResource.name} reserved for ${bookingForm.date} ${bookingForm.startTime}-${bookingForm.endTime}.`,
-      });
-    } catch (error) {
-      setMessage({
-        kind: 'error',
-        text: error instanceof Error ? error.message : 'Booking failed.',
-      });
-    } finally {
-      setBusy(null);
-    }
-  };
-
   if (!user) {
     return <Auth onLogin={handleLogin} />;
   }
@@ -297,9 +267,17 @@ function App() {
           <Sidebar
             user={user}
             current={view}
+            open={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            onLogout={() => {
+              window.localStorage.removeItem('nexus-user');
+              setUser(null);
+              setView('explore');
+            }}
             onSelect={nextView => {
               setSelectedId(null);
               setView(nextView);
+              setSidebarOpen(false);
             }}
           />
 
@@ -308,6 +286,7 @@ function App() {
               view={view}
               serverTime={bootstrap?.serverTime}
               onRefresh={loadBootstrap}
+              onMenu={() => setSidebarOpen(true)}
             />
 
             <div className="flex-1 overflow-y-auto pr-2">
@@ -324,16 +303,25 @@ function App() {
                       resources={filteredResources}
                       selectedResource={selectedResource}
                       bookings={bootstrap.bookings}
+                      recommendation={recommendation}
                       search={search}
                       category={category}
                       bookingForm={bookingForm}
                       onSearchChange={setSearch}
                       onCategoryChange={setCategory}
-                      onSelectResource={setSelectedId}
-                      onBack={() => setSelectedId(null)}
+                      onSelectResource={id => {
+                        setSelectedId(id);
+                        setRecommendation(null);
+                      }}
+                      onBack={() => {
+                        setSelectedId(null);
+                        setRecommendation(null);
+                      }}
                       onBookingFormChange={setBookingForm}
-                      onBook={handleBooking}
-                      busy={busy === 'booking'}
+                      onOpenReservation={() => {
+                        setReservationSeed(bookingForm);
+                        setReservationOpen(true);
+                      }}
                     />
                   )}
                   {view === 'map' && (
@@ -350,14 +338,33 @@ function App() {
                       <UsageAudit
                         isDarkMode
                         resources={resources}
+                        dashboard={bootstrap.dashboard}
                         onStatusChange={handleStatusChange}
                       />
                     </div>
                   )}
                   {view === 'guide' && (
                     <div className="px-4 pb-10 md:px-8">
-                      <SystemGuide isDarkMode />
+                      <SystemGuide isDarkMode guide={bootstrap.guide} />
                     </div>
+                  )}
+                  {view === 'reservations' && (
+                    <ReservationsScreen
+                      bookings={bootstrap.bookings}
+                      user={user}
+                      onBrowse={() => setView('explore')}
+                    />
+                  )}
+                  {view === 'conflicts' && (
+                    <ConflictResolutionScreen
+                      resources={resources}
+                      bookings={bootstrap.bookings}
+                      issues={bootstrap.issues}
+                      onJumpToResource={resourceId => {
+                        setView('explore');
+                        setSelectedId(resourceId);
+                      }}
+                    />
                   )}
                 </>
               ) : null}
@@ -378,9 +385,48 @@ function App() {
         </div>
       ) : null}
 
-      <button className="fixed right-6 bottom-6 z-40 h-14 w-14 rounded-2xl bg-blue-600 text-xl shadow-[0_0_40px_rgba(59,130,246,0.45)] border border-blue-400/40">
-        ☼
-      </button>
+      <ReservationFlowModal
+        open={reservationOpen}
+        seed={reservationSeed}
+        user={user}
+        resource={selectedResource}
+        resources={resources}
+        bookings={bootstrap?.bookings || []}
+        onClose={() => setReservationOpen(false)}
+        onConfirm={async payload => {
+          setBusy('booking');
+          setRecommendation(null);
+          try {
+            const response = await fetch(`${API_BASE}/bookings`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            const body = await response.json();
+            if (!response.ok) {
+              setRecommendation(body.recommendation || null);
+              throw new Error(body.message || 'Booking failed.');
+            }
+            await loadBootstrap();
+            setSelectedId(body.booking?.resourceId || payload.resourceId);
+            setRecommendation(body.recommendation || null);
+            setMessage({
+              kind: 'success',
+              text: `Booking confirmed for ${body.booking?.date || payload.date} ${body.booking?.startTime || payload.startTime}-${body.booking?.endTime || payload.endTime}.`,
+            });
+            return { ok: true as const };
+          } catch (error) {
+            setMessage({
+              kind: 'error',
+              text: error instanceof Error ? error.message : 'Booking failed.',
+            });
+            return { ok: false as const, message: error instanceof Error ? error.message : 'Booking failed.' };
+          } finally {
+            setBusy(null);
+          }
+        }}
+        busy={busy === 'booking'}
+      />
     </div>
   );
 }
@@ -388,57 +434,101 @@ function App() {
 function Sidebar({
   user,
   current,
+  open,
+  onClose,
+  onLogout,
   onSelect,
 }: {
   user: User;
   current: ViewKey;
+  open: boolean;
+  onClose: () => void;
+  onLogout: () => void;
   onSelect: (view: ViewKey) => void;
 }) {
   const items: Array<{ key: ViewKey; label: string; icon: string }> = [
     { key: 'explore', label: 'EXPLORE RESOURCES', icon: '⬡' },
     { key: 'map', label: 'LIVE MAP', icon: '⌘' },
+    { key: 'reservations', label: 'RESERVATIONS', icon: '⧗' },
+    { key: 'conflicts', label: 'CONFLICT CENTER', icon: '⊗' },
     { key: 'admin', label: 'ADMIN DASHBOARD', icon: '▦' },
     { key: 'guide', label: 'SYSTEM GUIDE', icon: 'ⓘ' },
   ];
 
-  return (
-    <aside className="w-[260px] border-r border-white/10 bg-[linear-gradient(180deg,#071029,#050914)] flex flex-col px-4 py-5">
-      <div className="rounded-[22px] border border-white/10 bg-blue-950/30 px-4 py-4 flex items-center gap-3 mb-6">
-        <div className="h-11 w-11 rounded-2xl border border-blue-500/30 bg-blue-600/10 grid place-items-center text-blue-400 text-xl">
+  const content = (
+    <aside className="w-72 border-r border-white/10 bg-[linear-gradient(180deg,#071029,#050914)] flex flex-col px-5 py-6">
+      <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-4 flex items-center gap-3">
+        <div className="h-11 w-11 rounded-2xl border border-blue-500/30 bg-blue-600/10 grid place-items-center text-blue-300 text-xl shadow-[0_0_22px_rgba(59,130,246,0.22)]">
           ⌬
         </div>
-        <div className="font-black tracking-[0.18em] text-lg">NEXUS</div>
+        <div>
+          <div className="font-black tracking-[0.22em] text-lg leading-none">NEXUS</div>
+          <div className="mt-1 text-[10px] font-black uppercase tracking-[0.28em] text-white/35">
+            Smart Campus OS
+          </div>
+        </div>
       </div>
 
-      <nav className="space-y-3">
+      <div className="mt-7 text-[10px] font-black uppercase tracking-[0.28em] text-white/35 px-2">
+        Navigation
+      </div>
+
+      <nav className="mt-4 space-y-2">
         {items.map(item => (
           <button
             key={item.key}
             onClick={() => onSelect(item.key)}
-            className={`w-full rounded-2xl px-4 py-4 flex items-center gap-3 text-left text-[11px] font-black tracking-[0.15em] transition-all ${
+            className={`w-full rounded-2xl px-4 py-3.5 flex items-center gap-3 text-left text-[12px] font-black tracking-[0.14em] transition-all ${
               current === item.key
-                ? 'bg-blue-600 text-white shadow-[0_0_24px_rgba(59,130,246,0.35)]'
-                : 'bg-white/[0.02] text-white/80 hover:bg-white/[0.06]'
+                ? 'bg-blue-600 text-white shadow-[0_0_26px_rgba(59,130,246,0.35)]'
+                : 'bg-white/[0.02] text-white/80 hover:bg-white/[0.06] hover:text-white'
             }`}
           >
-            <span className="text-sm">{item.icon}</span>
+            <span className="text-base">{item.icon}</span>
             {item.label}
           </button>
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-white/10 pt-4 flex items-center gap-3">
-        <div className="h-10 w-10 rounded-2xl bg-lime-300 text-black font-black grid place-items-center">
-          A
-        </div>
-        <div>
-          <div className="text-[10px] font-black tracking-[0.18em] uppercase">
-            {user.role === 'admin' ? 'ADMIN' : user.name}
+      <div className="mt-auto pt-6">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-lime-300 text-black font-black grid place-items-center">
+          {(user.name || user.email || 'N').slice(0, 1).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] font-black tracking-[0.18em] uppercase truncate">
+                {user.role === 'admin' ? 'ADMIN' : user.name}
+              </div>
+              <div className="text-[10px] text-white/40 truncate">{user.email}</div>
+            </div>
           </div>
-          <div className="text-[10px] text-white/40">{user.email}</div>
+
+          <button
+            onClick={onLogout}
+            className="mt-4 w-full rounded-2xl border border-white/10 bg-white/[0.03] py-3 text-[10px] font-black uppercase tracking-[0.22em] text-white/70 hover:bg-white/[0.06] hover:text-white"
+          >
+            Log out
+          </button>
         </div>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      <div className="hidden md:flex">{content}</div>
+      {open ? (
+        <div className="md:hidden fixed inset-0 z-[80]">
+          <button
+            aria-label="Close navigation"
+            onClick={onClose}
+            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+          />
+          <div className="absolute inset-y-0 left-0 shadow-2xl">{content}</div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -446,14 +536,18 @@ function HeaderBar({
   view,
   serverTime,
   onRefresh,
+  onMenu,
 }: {
   view: ViewKey;
   serverTime?: string;
   onRefresh: () => void;
+  onMenu: () => void;
 }) {
   const viewTitle: Record<ViewKey, string> = {
     explore: 'EXPLORER',
     map: 'LIVE CAMPUS MAP',
+    reservations: 'RESERVATIONS',
+    conflicts: 'CONFLICT RESOLUTION',
     admin: 'Command Center',
     guide: 'NEXUS SYSTEM GUIDE',
   };
@@ -474,6 +568,13 @@ function HeaderBar({
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={onMenu}
+            className="md:hidden h-10 w-10 rounded-xl border border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.08]"
+            aria-label="Open navigation"
+          >
+            ☰
+          </button>
           <div className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/80">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-2 shadow-[0_0_10px_#10b981]" />
             SYSTEMS: OPERATIONAL
@@ -497,6 +598,7 @@ function ExplorerScreen({
   resources,
   selectedResource,
   bookings,
+  recommendation,
   search,
   category,
   bookingForm,
@@ -505,12 +607,12 @@ function ExplorerScreen({
   onSelectResource,
   onBack,
   onBookingFormChange,
-  onBook,
-  busy,
+  onOpenReservation,
 }: {
   resources: Resource[];
   selectedResource: Resource | null;
   bookings: Booking[];
+  recommendation: { title: string; action: string } | null;
   search: string;
   category: CategoryKey;
   bookingForm: { date: string; startTime: string; endTime: string };
@@ -521,8 +623,7 @@ function ExplorerScreen({
   onBookingFormChange: React.Dispatch<
     React.SetStateAction<{ date: string; startTime: string; endTime: string }>
   >;
-  onBook: () => void;
-  busy: boolean;
+  onOpenReservation: () => void;
 }) {
   const filters: Array<{ key: CategoryKey; label: string }> = [
     { key: 'all', label: 'ALL' },
@@ -684,12 +785,21 @@ function ExplorerScreen({
               </div>
 
               <button
-                onClick={onBook}
-                disabled={busy}
+                onClick={onOpenReservation}
                 className="w-full rounded-2xl bg-blue-600 py-5 text-xs font-black uppercase tracking-[0.32em] shadow-[0_0_30px_rgba(37,99,235,0.3)] hover:bg-blue-500 disabled:opacity-60"
               >
-                {busy ? 'EXECUTING...' : 'EXECUTE BOOKING'}
+                EXECUTE BOOKING
               </button>
+
+              {recommendation ? (
+                <div className="mt-6 rounded-[24px] border border-cyan-400/20 bg-cyan-400/8 p-5">
+                  <div className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-300">
+                    AI Recommendation
+                  </div>
+                  <div className="mt-3 text-lg font-black text-white">{recommendation.title}</div>
+                  <p className="mt-3 text-sm leading-6 text-white/65">{recommendation.action}</p>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -877,6 +987,764 @@ function MapScreen({
               {filter.label}
             </button>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReservationsScreen({
+  bookings,
+  user,
+  onBrowse,
+}: {
+  bookings: Booking[];
+  user: User;
+  onBrowse: () => void;
+}) {
+  const mine = bookings.filter(item => item.userEmail === user.email);
+  const total = bookings.length;
+  const confirmed = bookings.filter(item => item.status === 'confirmed').length;
+
+  return (
+    <div className="px-4 md:px-8 pb-12">
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-4 rounded-[32px] border border-white/10 bg-[#0a0a16]/70 p-7">
+          <div className="text-[10px] font-black uppercase tracking-[0.28em] text-blue-300">
+            Booking ledger
+          </div>
+          <h2 className="mt-3 text-5xl font-black leading-none">History</h2>
+          <p className="mt-4 text-sm leading-7 text-white/60">
+            Confirmed leases and recent deployment activity. Entries stream from the Nexus backend.
+          </p>
+
+          <div className="mt-8 grid grid-cols-2 gap-4">
+            <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-5">
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">
+                Total
+              </div>
+              <div className="mt-3 text-3xl font-black text-white">{total}</div>
+            </div>
+            <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-5">
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">
+                Mine
+              </div>
+              <div className="mt-3 text-3xl font-black text-blue-200">{mine.length}</div>
+            </div>
+            <div className="rounded-[22px] border border-emerald-400/18 bg-emerald-400/8 p-5 col-span-2">
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-200/80">
+                Confirmed
+              </div>
+              <div className="mt-3 text-3xl font-black text-emerald-300">{confirmed}</div>
+            </div>
+          </div>
+
+          <button
+            onClick={onBrowse}
+            className="mt-8 w-full rounded-2xl bg-blue-600 py-4 text-[11px] font-black uppercase tracking-[0.28em] hover:bg-blue-500"
+          >
+            Browse resources
+          </button>
+        </div>
+
+        <div className="lg:col-span-8 rounded-[32px] border border-white/10 bg-[#0a0a16]/70 p-7 overflow-hidden">
+          <div className="flex items-center justify-between gap-4 mb-5">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.28em] text-white/35">
+                Live booking stream
+              </div>
+              <h3 className="mt-2 text-2xl font-black uppercase tracking-[0.08em] text-white">
+                Confirmations
+              </h3>
+            </div>
+            <div className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/70">
+              Sync: {new Date().toISOString().slice(11, 19)}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <div className="min-w-[720px]">
+              <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr] gap-3 border-b border-white/10 bg-white/[0.02] px-5 py-4 text-[10px] font-black uppercase tracking-[0.22em] text-white/50">
+                <span>Resource</span>
+                <span>Date</span>
+                <span>Start</span>
+                <span>End</span>
+                <span>Status</span>
+              </div>
+
+              {bookings.length === 0 ? (
+                <div className="px-5 py-12 text-center text-sm text-white/45">
+                  No bookings detected yet. Execute a reservation to populate the ledger.
+                </div>
+              ) : (
+                bookings.slice(0, 18).map(item => (
+                  <div
+                    key={item.id}
+                    className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr] gap-3 items-center border-b border-white/5 bg-white/[0.01] px-5 py-5 text-sm last:border-b-0"
+                  >
+                    <div>
+                      <div className="font-black uppercase tracking-[0.12em] text-white">
+                        {item.resourceName}
+                      </div>
+                      <div className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/35">
+                        {item.userEmail === user.email ? 'Your node' : item.userEmail}
+                      </div>
+                    </div>
+                    <span className="text-white/70">{item.date}</span>
+                    <span className="text-white/70">{item.startTime}</span>
+                    <span className="text-white/70">{item.endTime}</span>
+                    <span
+                      className={`inline-flex w-fit rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] ${
+                        item.status === 'confirmed'
+                          ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200'
+                          : 'border-white/10 bg-white/[0.03] text-white/60'
+                      }`}
+                    >
+                      {item.status}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConflictResolutionScreen({
+  resources,
+  bookings,
+  issues,
+  onJumpToResource,
+}: {
+  resources: Resource[];
+  bookings: Booking[];
+  issues: Array<{ id: string; resourceId: string; summary: string; resourceName?: string; severity?: string; createdAt?: string; resolved?: boolean }>;
+  onJumpToResource: (resourceId: string) => void;
+}) {
+  const [resourceId, setResourceId] = useState(resources[0]?.id || '');
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [startTime, setStartTime] = useState('10:00');
+  const [endTime, setEndTime] = useState('12:00');
+
+  const toMinutes = (time: string) => {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const overlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string) => {
+    const a0 = toMinutes(aStart);
+    const a1 = toMinutes(aEnd);
+    const b0 = toMinutes(bStart);
+    const b1 = toMinutes(bEnd);
+    return a0 < b1 && b0 < a1;
+  };
+
+  const selected = resources.find(item => item.id === resourceId) || null;
+  const conflict = bookings.find(
+    booking =>
+      booking.resourceId === resourceId &&
+      booking.date === date &&
+      booking.status === 'confirmed' &&
+      overlaps(booking.startTime, booking.endTime, startTime, endTime)
+  );
+
+  const viableAlternatives = useMemo(() => {
+    if (!selected) return [];
+    return resources
+      .filter(item => item.id !== selected.id)
+      .filter(item => item.category === selected.category)
+      .filter(item => item.status === 'available')
+      .filter(item => item.capacity >= selected.capacity)
+      .filter(item => {
+        const hit = bookings.find(
+          booking =>
+            booking.resourceId === item.id &&
+            booking.date === date &&
+            booking.status === 'confirmed' &&
+            overlaps(booking.startTime, booking.endTime, startTime, endTime)
+        );
+        return !hit;
+      })
+      .slice(0, 3);
+  }, [bookings, date, endTime, resources, selected, startTime]);
+
+  return (
+    <div className="px-4 md:px-8 pb-12">
+      <div className="mt-6 grid grid-cols-1 xl:grid-cols-12 gap-6">
+        <div className="xl:col-span-5 space-y-6">
+          <div className="rounded-[32px] border border-white/10 bg-[#0a0a16]/70 p-7">
+            <div className="text-[10px] font-black uppercase tracking-[0.28em] text-blue-300">
+              Conflict detection
+            </div>
+            <h2 className="mt-3 text-4xl font-black uppercase tracking-tight">Resolution Center</h2>
+            <p className="mt-4 text-sm leading-7 text-white/60">
+              Run a collision scan against confirmed bookings and receive an optimized alternative.
+            </p>
+          </div>
+
+          <div className="rounded-[32px] border border-white/10 bg-[#0a0a16]/80 p-7">
+            <div className="text-[10px] font-black uppercase tracking-[0.28em] text-white/35 mb-5">
+              Collision simulator
+            </div>
+
+            <div className="space-y-5">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-white/30 mb-2">
+                  Resource node
+                </label>
+                <select
+                  value={resourceId}
+                  onChange={event => setResourceId(event.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm"
+                >
+                  {resources.map(item => (
+                    <option key={item.id} value={item.id} className="bg-[#070a14]">
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-white/30 mb-2">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={event => setDate(event.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-white/30 mb-2">
+                    Start
+                  </label>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={event => setStartTime(event.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-white/30 mb-2">
+                  End
+                </label>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={event => setEndTime(event.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm"
+                />
+              </div>
+
+              {conflict ? (
+                <div className="rounded-[26px] border border-rose-400/20 bg-rose-500/10 p-6">
+                  <div className="text-[10px] font-black uppercase tracking-[0.24em] text-rose-300">
+                    Collision detected
+                  </div>
+                  <div className="mt-3 text-xl font-black text-white">Overlap identified</div>
+                  <div className="mt-3 text-sm text-white/70">
+                    Existing booking: {conflict.startTime} → {conflict.endTime} ({conflict.userEmail})
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-[26px] border border-emerald-400/18 bg-emerald-400/10 p-6">
+                  <div className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-200/80">
+                    Conflict check
+                  </div>
+                  <div className="mt-3 text-xl font-black text-white">Clear</div>
+                  <div className="mt-3 text-sm text-white/70">
+                    No overlaps detected for the requested window.
+                  </div>
+                </div>
+              )}
+
+              {conflict && viableAlternatives.length > 0 ? (
+                <div className="rounded-[28px] border border-cyan-400/18 bg-cyan-500/8 p-6">
+                  <div className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-300">
+                    Suggested alternatives
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {viableAlternatives.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => onJumpToResource(item.id)}
+                        className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-left hover:bg-white/[0.06]"
+                      >
+                        <div className="flex justify-between items-center">
+                          <div className="text-sm font-black text-white">{item.name}</div>
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300">
+                            Open
+                          </span>
+                        </div>
+                        <div className="mt-2 text-[11px] uppercase tracking-[0.18em] text-white/45">
+                          Capacity {item.capacity} • {item.location}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="xl:col-span-7 space-y-6">
+          <div className="rounded-[32px] border border-white/10 bg-[#0a0a16]/70 p-7">
+            <div className="flex items-center justify-between gap-4 mb-5">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.28em] text-white/35">
+                  Incident queue
+                </div>
+                <h3 className="mt-2 text-2xl font-black uppercase tracking-[0.08em] text-white">
+                  Active conflicts / issues
+                </h3>
+              </div>
+              <div className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/70">
+                {issues.length} flagged
+              </div>
+            </div>
+
+            {issues.length === 0 ? (
+              <div className="rounded-[28px] border border-white/10 bg-white/[0.02] px-6 py-10 text-center text-sm text-white/45">
+                No incidents currently queued.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {issues.slice(0, 8).map(issue => (
+                  <div
+                    key={issue.id}
+                    className="rounded-[28px] border border-amber-400/14 bg-amber-400/6 p-6"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-200/80">
+                        {issue.severity || 'medium'} priority
+                      </div>
+                      <span className="h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_14px_rgba(252,211,77,0.8)]" />
+                    </div>
+                    <div className="mt-3 text-lg font-black text-white">
+                      {issue.resourceName || resources.find(r => r.id === issue.resourceId)?.name || 'Resource'}
+                    </div>
+                    <p className="mt-3 text-sm leading-7 text-white/65">{issue.summary}</p>
+                    <button
+                      onClick={() => onJumpToResource(issue.resourceId)}
+                      className="mt-5 w-full rounded-2xl border border-white/10 bg-white/[0.03] py-3 text-[10px] font-black uppercase tracking-[0.22em] text-white/75 hover:bg-white/[0.06]"
+                    >
+                      Open node
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type BookingRequestPayload = {
+  resourceId: string;
+  userEmail: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+};
+
+function ReservationFlowModal({
+  open,
+  seed,
+  user,
+  resource,
+  resources,
+  bookings,
+  onClose,
+  onConfirm,
+  busy,
+}: {
+  open: boolean;
+  seed: { date: string; startTime: string; endTime: string };
+  user: User;
+  resource: Resource | null;
+  resources: Resource[];
+  bookings: Booking[];
+  onClose: () => void;
+  onConfirm: (payload: BookingRequestPayload) => Promise<{ ok: true } | { ok: false; message: string }>;
+  busy: boolean;
+}) {
+  const [step, setStep] = useState<'schedule' | 'checking' | 'conflict' | 'summary' | 'success'>('schedule');
+  const [form, setForm] = useState(seed);
+  const [activeResourceId, setActiveResourceId] = useState<string>(resource?.id || '');
+  const [conflict, setConflict] = useState<Booking | null>(null);
+  const [alt, setAlt] = useState<Resource | null>(null);
+  const [inlineError, setInlineError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setStep('schedule');
+    setForm(seed);
+    setActiveResourceId(resource?.id || '');
+    setConflict(null);
+    setAlt(null);
+    setInlineError(null);
+  }, [open, resource?.id, seed]);
+
+  const toMinutes = (time: string) => {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const overlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string) => {
+    const a0 = toMinutes(aStart);
+    const a1 = toMinutes(aEnd);
+    const b0 = toMinutes(bStart);
+    const b1 = toMinutes(bEnd);
+    return a0 < b1 && b0 < a1;
+  };
+
+  const activeResource = useMemo(
+    () => resources.find(item => item.id === activeResourceId) || null,
+    [activeResourceId, resources]
+  );
+
+  const runConflictCheck = () => {
+    setInlineError(null);
+    if (!activeResource) return;
+    if (toMinutes(form.startTime) >= toMinutes(form.endTime)) {
+      setInlineError('Finish time must be later than start time.');
+      return;
+    }
+
+    setStep('checking');
+    window.setTimeout(() => {
+      const hit =
+        bookings.find(
+          booking =>
+            booking.resourceId === activeResource.id &&
+            booking.date === form.date &&
+            booking.status === 'confirmed' &&
+            overlaps(booking.startTime, booking.endTime, form.startTime, form.endTime)
+        ) || null;
+
+      setConflict(hit);
+      if (hit) {
+        const suggestion =
+          resources
+            .filter(item => item.id !== activeResource.id)
+            .filter(item => item.category === activeResource.category)
+            .filter(item => item.status === 'available')
+            .filter(item => item.capacity >= activeResource.capacity)
+            .find(item => {
+              const clash = bookings.find(
+                booking =>
+                  booking.resourceId === item.id &&
+                  booking.date === form.date &&
+                  booking.status === 'confirmed' &&
+                  overlaps(booking.startTime, booking.endTime, form.startTime, form.endTime)
+              );
+              return !clash;
+            }) || null;
+
+        setAlt(suggestion);
+        setStep('conflict');
+      } else {
+        setAlt(null);
+        setStep('summary');
+      }
+    }, 900);
+  };
+
+  const confirmBooking = async () => {
+    setInlineError(null);
+    if (!activeResource) return;
+    setStep('checking');
+    const result = await onConfirm({
+      resourceId: activeResource.id,
+      userEmail: user.email,
+      date: form.date,
+      startTime: form.startTime,
+      endTime: form.endTime,
+    });
+
+    if (result.ok) {
+      setStep('success');
+      window.setTimeout(() => onClose(), 1200);
+      return;
+    }
+
+    setInlineError(result.message || 'Booking failed.');
+    setStep('summary');
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+      <div className="w-full max-w-2xl rounded-[34px] border border-white/10 bg-[#070a18]/90 shadow-2xl overflow-hidden">
+        <div className="px-7 py-6 border-b border-white/10 flex items-start justify-between gap-4">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.28em] text-blue-300">
+              Reservation protocol
+            </div>
+            <div className="mt-3 text-2xl font-black text-white">
+              {activeResource?.name || resource?.name || 'Select Resource'}
+            </div>
+            <div className="mt-2 text-[11px] uppercase tracking-[0.18em] text-white/45">
+              {form.date} • {form.startTime} → {form.endTime}
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="h-10 w-10 rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.08]"
+            aria-label="Close reservation"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="px-7 py-7">
+          {inlineError ? (
+            <div className="mb-5 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+              {inlineError}
+            </div>
+          ) : null}
+
+          {step === 'schedule' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-white/30 mb-2">
+                  Resource node
+                </label>
+                <select
+                  value={activeResourceId}
+                  onChange={event => setActiveResourceId(event.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm"
+                >
+                  {resources.map(item => (
+                    <option key={item.id} value={item.id} className="bg-[#070a14]">
+                      {item.name} ({item.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-white/30 mb-2">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={event => setForm(current => ({ ...current, date: event.target.value }))}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-white/30 mb-2">
+                  Start
+                </label>
+                <input
+                  type="time"
+                  value={form.startTime}
+                  onChange={event => setForm(current => ({ ...current, startTime: event.target.value }))}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-white/30 mb-2">
+                  End
+                </label>
+                <input
+                  type="time"
+                  value={form.endTime}
+                  onChange={event => setForm(current => ({ ...current, endTime: event.target.value }))}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm"
+                />
+              </div>
+
+              <div className="md:col-span-2 flex gap-3 pt-3">
+                <button
+                  onClick={onClose}
+                  className="flex-1 rounded-2xl border border-white/10 bg-white/[0.03] py-4 text-[10px] font-black uppercase tracking-[0.28em] text-white/70 hover:bg-white/[0.06]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={runConflictCheck}
+                  className="flex-1 rounded-2xl bg-blue-600 py-4 text-[10px] font-black uppercase tracking-[0.28em] hover:bg-blue-500"
+                >
+                  Run conflict check
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {step === 'checking' ? (
+            <div className="py-12 text-center">
+              <div className="mx-auto h-14 w-14 rounded-full border-2 border-blue-400/30 border-t-blue-300 animate-spin" />
+              <div className="mt-6 text-[10px] font-black uppercase tracking-[0.28em] text-white/45">
+                Scanning availability matrix...
+              </div>
+              {busy ? (
+                <div className="mt-3 text-[10px] font-black uppercase tracking-[0.22em] text-blue-200/80">
+                  Locking node
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {step === 'conflict' ? (
+            <div className="space-y-5">
+              <div className="rounded-[28px] border border-rose-400/20 bg-rose-500/10 p-6">
+                <div className="text-[10px] font-black uppercase tracking-[0.24em] text-rose-300">
+                  Collision detected
+                </div>
+                <div className="mt-3 text-xl font-black text-white">Reservation blocked</div>
+                <div className="mt-3 text-sm text-white/70">
+                  Overlap: {conflict?.startTime} → {conflict?.endTime} • {conflict?.userEmail}
+                </div>
+              </div>
+
+              {alt ? (
+                <div className="rounded-[28px] border border-cyan-400/20 bg-cyan-500/8 p-6">
+                  <div className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-300">
+                    AI Recommendation
+                  </div>
+                  <div className="mt-3 text-xl font-black text-white">{alt.name}</div>
+                  <div className="mt-2 text-sm text-white/65">
+                    Available for the same window • Capacity {alt.capacity}
+                  </div>
+                  <div className="mt-5 flex gap-3">
+                    <button
+                      onClick={() => {
+                        setActiveResourceId(alt.id);
+                        setStep('summary');
+                        setConflict(null);
+                      }}
+                      className="flex-1 rounded-2xl bg-blue-600 py-4 text-[10px] font-black uppercase tracking-[0.28em] hover:bg-blue-500"
+                    >
+                      Switch node
+                    </button>
+                    <button
+                      onClick={() => setStep('schedule')}
+                      className="flex-1 rounded-2xl border border-white/10 bg-white/[0.03] py-4 text-[10px] font-black uppercase tracking-[0.28em] text-white/70 hover:bg-white/[0.06]"
+                    >
+                      Edit request
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-[28px] border border-white/10 bg-white/[0.02] p-6">
+                  <div className="text-[10px] font-black uppercase tracking-[0.24em] text-white/45">
+                    No alternatives found
+                  </div>
+                  <div className="mt-4 flex gap-3">
+                    <button
+                      onClick={() => setStep('schedule')}
+                      className="flex-1 rounded-2xl bg-blue-600 py-4 text-[10px] font-black uppercase tracking-[0.28em] hover:bg-blue-500"
+                    >
+                      Adjust timing
+                    </button>
+                    <button
+                      onClick={onClose}
+                      className="flex-1 rounded-2xl border border-white/10 bg-white/[0.03] py-4 text-[10px] font-black uppercase tracking-[0.28em] text-white/70 hover:bg-white/[0.06]"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {step === 'summary' ? (
+            <div className="space-y-5">
+              <div className="rounded-[28px] border border-emerald-400/18 bg-emerald-400/10 p-6">
+                <div className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-200/80">
+                  Conflict check
+                </div>
+                <div className="mt-3 text-xl font-black text-white">Passed</div>
+                <div className="mt-3 text-sm text-white/70">
+                  Node ready for confirmation.
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-white/10 bg-white/[0.02] p-6">
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/45">
+                  Booking summary
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35">
+                      Resource
+                    </div>
+                    <div className="mt-2 font-black text-white">{activeResource?.name}</div>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35">
+                      Operator
+                    </div>
+                    <div className="mt-2 font-black text-white">{user.email}</div>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35">
+                      Window
+                    </div>
+                    <div className="mt-2 font-black text-white">
+                      {form.startTime} → {form.endTime}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35">
+                      Date
+                    </div>
+                    <div className="mt-2 font-black text-white">{form.date}</div>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex gap-3">
+                  <button
+                    onClick={() => setStep('schedule')}
+                    className="flex-1 rounded-2xl border border-white/10 bg-white/[0.03] py-4 text-[10px] font-black uppercase tracking-[0.28em] text-white/70 hover:bg-white/[0.06]"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={confirmBooking}
+                    className="flex-1 rounded-2xl bg-blue-600 py-4 text-[10px] font-black uppercase tracking-[0.28em] hover:bg-blue-500 disabled:opacity-60"
+                  >
+                    Confirm booking
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {step === 'success' ? (
+            <div className="py-14 text-center">
+              <div className="mx-auto h-16 w-16 rounded-full border-2 border-emerald-400/40 bg-emerald-400/10 grid place-items-center text-2xl text-emerald-200 shadow-[0_0_30px_rgba(52,211,153,0.25)]">
+                ✓
+              </div>
+              <div className="mt-7 text-2xl font-black uppercase tracking-[0.18em] text-white">
+                Lease secured
+              </div>
+              <div className="mt-3 text-[10px] font-black uppercase tracking-[0.28em] text-white/45">
+                Closing terminal...
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
