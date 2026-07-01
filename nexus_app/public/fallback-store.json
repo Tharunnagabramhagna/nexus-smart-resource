@@ -1,0 +1,146 @@
+{
+  "resources": [
+    {
+      "id": "lab-aiml",
+      "name": "AI/ML Computing Lab",
+      "category": "lab",
+      "status": "available",
+      "capacity": 50,
+      "location": "Cyber-Wing, Floor 2",
+      "zone": "A",
+      "maxLoad": 50,
+      "environment": "LAB",
+      "tag": "HIGH DEMAND",
+      "description": "Specialized deep learning facility with high-performance GPU clusters, modular workstations, and immersive model visualisation arrays.",
+      "assets": ["NVIDIA H100 GPU CLUSTER", "TENSOR PROCESSING UNITS (TPU V4)", "400GBPS INFINIBAND FABRIC"],
+      "specification": "Resource-optimised compute floor designed for AI research, simulation, and live inferencing.",
+      "preview": "network"
+    },
+    {
+      "id": "hall-newton",
+      "name": "Newton Lecture Hall",
+      "category": "room",
+      "status": "available",
+      "capacity": 180,
+      "location": "Academic Wing, Level 1",
+      "zone": "B",
+      "maxLoad": 180,
+      "environment": "ROOM",
+      "tag": "AI OPTIMIZED",
+      "description": "Premier large-capacity lecture hall built for hybrid teaching with panoramic projection and acoustic zoning.",
+      "assets": ["4K PANORAMIC PROJECTION", "HYBRID TEACHING ARRAY", "ADAPTIVE AUDIO MATRIX"],
+      "specification": "Large-format teaching venue for seminars, events, and real-time collaboration.",
+      "preview": "lecture"
+    },
+    {
+      "id": "hall-turing",
+      "name": "Turing Logic Hall",
+      "category": "room",
+      "status": "occupied",
+      "capacity": 80,
+      "location": "CS Block, Level 2",
+      "zone": "D",
+      "maxLoad": 80,
+      "environment": "ROOM",
+      "tag": "RESTRICTED",
+      "description": "Compact seminar hall for advanced sessions and review meetings with secure access control.",
+      "assets": ["SECURE ACCESS LOCK", "MODULAR STAGE POD", "LOW-LATENCY SCREEN CAST"],
+      "specification": "Best for focused academic meetings and controlled discussions.",
+      "preview": "seminar"
+    },
+    {
+      "id": "rack-gpu",
+      "name": "Mobile GPU Server Rack",
+      "category": "equipment",
+      "status": "available",
+      "capacity": 1,
+      "location": "Server Room 4A",
+      "zone": "E",
+      "maxLoad": 1,
+      "environment": "EQUIPMENT",
+      "tag": "AI OPTIMIZED",
+      "description": "Portable high-performance compute node for robotics demos, field inferencing, and burst workloads.",
+      "assets": ["DUAL GPU EDGE MODULE", "BATTERY BACKUP", "REMOTE TELEMETRY STACK"],
+      "specification": "Movable compute system for high-demand technical deployments.",
+      "preview": "equipment"
+    },
+    {
+      "id": "lab-raman",
+      "name": "Raman Physics Lab",
+      "category": "lab",
+      "status": "available",
+      "capacity": 42,
+      "location": "Science Block, Level 4",
+      "zone": "F",
+      "maxLoad": 42,
+      "environment": "LAB",
+      "tag": "LOW USAGE",
+      "description": "Precision instrumentation lab for optics, quantum experimentation, and signal analysis.",
+      "assets": ["LASER TEST BAY", "VACUUM CHAMBER", "ANALYSIS CONSOLE"],
+      "specification": "Controlled research environment with high-sensitivity instruments.",
+      "preview": "studio"
+    },
+    {
+      "id": "park-alpha",
+      "name": "Parking Bay Alpha-12",
+      "category": "parking",
+      "status": "maintenance",
+      "capacity": 1,
+      "location": "Lot A (North Gate)",
+      "zone": "P1",
+      "maxLoad": 1,
+      "environment": "PARKING",
+      "tag": "MAINTENANCE",
+      "description": "Reserved smart parking bay with occupancy telemetry and EV readiness.",
+      "assets": ["SENSOR PAD", "CAMERA CHECKPOINT", "EV CHARGER"],
+      "specification": "Single-slot parking node managed by Nexus scheduling.",
+      "preview": "gallery"
+    }
+  ],
+  "bookings": [
+    {
+      "id": "demo-booking-1",
+      "resourceId": "hall-turing",
+      "resourceName": "Turing Logic Hall",
+      "userEmail": "userA@srmap.edu.in",
+      "date": "2026-06-18",
+      "startTime": "10:00",
+      "endTime": "12:00",
+      "status": "confirmed",
+      "createdAt": "2026-06-18T06:20:00.000Z"
+    }
+  ],
+  "issues": [
+    {
+      "id": "demo-issue-1",
+      "resourceId": "park-alpha",
+      "resourceName": "Parking Bay Alpha-12",
+      "severity": "medium",
+      "summary": "Telemetry desync detected: bay reporting occupied while offline.",
+      "reportedBy": "admin@nexus.ai",
+      "createdAt": "2026-06-18T07:05:00.000Z",
+      "resolved": false
+    }
+  ],
+  "activityLog": [
+    {
+      "id": "log-1",
+      "resourceName": "Turing Logic Hall",
+      "timestamp": "2026-06-18T06:20:00.000Z",
+      "message": "BOOKING_OK"
+    },
+    {
+      "id": "log-2",
+      "resourceName": "Parking Bay Alpha-12",
+      "timestamp": "2026-06-18T07:05:00.000Z",
+      "message": "ISSUE_REPORTED"
+    },
+    {
+      "id": "log-3",
+      "resourceName": "AI/ML Computing Lab",
+      "timestamp": "2026-06-18T08:12:00.000Z",
+      "message": "STATE_AVAILABLE"
+    }
+  ]
+}
+

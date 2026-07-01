@@ -151,6 +151,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [offlineMode, setOfflineMode] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [category, setCategory] = useState<CategoryKey>('all');
   const [search, setSearch] = useState('');
@@ -163,6 +164,107 @@ function App() {
   const [reservationOpen, setReservationOpen] = useState(false);
   const [reservationSeed, setReservationSeed] = useState(defaultBookingForm);
 
+  const buildBootstrapFromFallback = (store: any): BootstrapData => {
+    const resources = Array.isArray(store?.resources) ? store.resources : [];
+    const bookings = Array.isArray(store?.bookings) ? store.bookings.slice().reverse() : [];
+    const issues = Array.isArray(store?.issues) ? store.issues.slice().reverse() : [];
+    const activityLog = Array.isArray(store?.activityLog) ? store.activityLog.slice().reverse() : [];
+
+    const statusCounts: Record<StatusKey, number> = {
+      available: 0,
+      occupied: 0,
+      maintenance: 0,
+    };
+
+    const utilizationSeed: Record<string, { total: number; occupied: number }> = {};
+    for (const resource of resources) {
+      const status = resource.status as StatusKey;
+      if (statusCounts[status] !== undefined) statusCounts[status] += 1;
+
+      const categoryKey = String(resource.category || 'unknown').toUpperCase();
+      utilizationSeed[categoryKey] = utilizationSeed[categoryKey] || { total: 0, occupied: 0 };
+      utilizationSeed[categoryKey].total += 1;
+      if (status === 'occupied') utilizationSeed[categoryKey].occupied += 1;
+    }
+
+    const utilization = Object.entries(utilizationSeed).map(([category, info]) => ({
+      category,
+      percent: info.total ? Math.round((info.occupied / info.total) * 100) : 0,
+    }));
+
+    const anomalies = issues.slice(0, 4).map((issue: any) => ({
+      id: issue.id || cryptoRandomId(),
+      name: issue.resourceName || resources.find((r: any) => r.id === issue.resourceId)?.name || 'RESOURCE',
+      signal: String(issue.summary || 'INCIDENT').toUpperCase().slice(0, 42),
+    }));
+
+    const dashboard: DashboardData = {
+      stats: [
+        { label: 'ACTIVE NODES', value: String(resources.length) },
+        { label: 'CONFIRMED LOADS', value: String(bookings.filter((b: any) => b.status === 'confirmed').length) },
+        { label: 'OPEN INCIDENTS', value: String(issues.filter((i: any) => !i.resolved).length) },
+        { label: 'SYSTEM HEALTH', value: '99.9%' },
+      ],
+      utilization,
+      impact: { baseline: '2.3', optimized: '3.0', gain: '+28.2%' },
+      anomalies,
+      activityLog: activityLog.slice(0, 6).map((log: any) => ({
+        id: log.id || cryptoRandomId(),
+        resourceName: log.resourceName || 'SYSTEM',
+        timestamp: log.timestamp || new Date().toISOString(),
+        message: log.message || 'SYNC',
+      })),
+      nodeCounts: statusCounts,
+    };
+
+    const guide: GuideData = {
+      directive:
+        'Demo mode: Backend is unavailable. The UI is running with a local snapshot so you can preview Explorer, Map, Admin widgets, and the booking conflict flow.',
+      architecture: [
+        { id: 'frontend', title: 'FRONTEND', description: 'Static UI shell with glassmorphism + neon HUD components.' },
+        { id: 'backend', title: 'BACKEND', description: 'API layer that powers bookings, metrics, and conflict detection.' },
+        { id: 'scheduler', title: 'SCHEDULER', description: 'Atomic booking validation preventing overlaps.' },
+        { id: 'telemetry', title: 'TELEMETRY', description: 'Resource status + anomaly tracking across campus zones.' },
+      ],
+      roadmap: [
+        { label: 'AUTH', detail: 'Sync institutional identity via /api/auth/login.' },
+        { label: 'BOOKINGS', detail: 'POST /api/bookings validates collisions and issues recommendations.' },
+        { label: 'METRICS', detail: 'GET /api/dashboard streams utilization + impact analytics.' },
+      ],
+      impact: [
+        { metric: 'CONFIRMATION TIME', before: '4.2m', after: '1.7m', delta: '+59%' },
+        { metric: 'UTILIZATION', before: '63%', after: '81%', delta: '+28%' },
+        { metric: 'COLLISIONS', before: 'High', after: 'Blocked', delta: '-100%' },
+      ],
+    };
+
+    const liveMap: MapNode[] = resources.slice(0, 10).map((resource: any, index: number) => ({
+      id: String(resource.id),
+      name: String(resource.name).slice(0, 18),
+      category: resource.category,
+      status: resource.status,
+      x: 8 + (index % 5) * 18,
+      y: 12 + Math.floor(index / 5) * 26,
+      width: 16,
+      height: 10,
+    }));
+
+    return {
+      resources,
+      bookings,
+      issues,
+      dashboard,
+      guide,
+      liveMap,
+      serverTime: new Date().toISOString(),
+    };
+  };
+
+  const cryptoRandomId = () => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  };
+
   const loadBootstrap = async () => {
     try {
       const response = await fetch(`${API_BASE}/bootstrap`);
@@ -171,11 +273,25 @@ function App() {
       }
       const data = (await response.json()) as BootstrapData;
       setBootstrap(data);
+      setOfflineMode(false);
     } catch (error) {
-      setMessage({
-        kind: 'error',
-        text: error instanceof Error ? error.message : 'Unable to load the app.',
-      });
+      try {
+        const fallbackResponse = await fetch(`${import.meta.env.BASE_URL}fallback-store.json`, {
+          cache: 'no-store',
+        });
+        if (fallbackResponse.ok) {
+          const store = await fallbackResponse.json();
+          setBootstrap(buildBootstrapFromFallback(store));
+          setOfflineMode(true);
+        } else {
+          throw new Error('Fallback snapshot missing.');
+        }
+      } catch {
+        setMessage({
+          kind: 'error',
+          text: error instanceof Error ? error.message : 'Unable to load the app.',
+        });
+      }
     } finally {
       setLoading(false);
     }
